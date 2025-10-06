@@ -3,8 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Reto XR – Demo AR con &lt;model-viewer&gt;</title>
-    <!-- Carga del componente model-viewer (Google) desde CDN -->
+    <title>Reto XR – Demo AR con <model-viewer></title>
     <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
     <style>
       * { box-sizing: border-box; }
@@ -13,54 +12,50 @@
       h1 { margin:0 0 4px 0; font-size:20px; }
       p { margin:4px 0; }
       model-viewer { width: 100vw; height: calc(100vh - 78px); display:block; background:#f7f7f7; }
-      /* Botón AR visible solo en móviles compatibles */
       button[slot="ar-button"] {
-        position: absolute;
-        left: 50%;
-        transform: translateX(-50%);
-        bottom: 16px;
-        padding: 12px 16px;
-        font-size: 16px;
-        border: none;
-        border-radius: 8px;
-        box-shadow: 0 6px 14px rgba(0,0,0,0.15);
-        background: white;
-        cursor: pointer;
+        position: absolute; left: 50%; transform: translateX(-50%); bottom: 16px;
+        padding: 12px 16px; font-size: 16px; border: none; border-radius: 8px;
+        box-shadow: 0 6px 14px rgba(0,0,0,0.15); background: white; cursor: pointer;
       }
       .hint { font-size:13px; opacity:.75; }
+      .center { text-align:center; margin:16px 0; }
+      .btn {
+        display:inline-block; padding:12px 16px; border-radius:8px; border:1px solid #ddd; text-decoration:none;
+      }
     </style>
   </head>
 
   <body>
     <header>
       <h1>Mi primera experiencia AR</h1>
-      <p>Abre esta página en tu móvil y toca <strong>“Ver en tu espacio”</strong>. Mueve el teléfono para detectar el suelo.</p>
-      <p class="hint">Si estás en ordenador, verás el modelo 3D con el ratón; el modo AR aparece solo en móviles compatibles.</p>
+      <p>Abre esta página en tu móvil y toca <strong>“Ver en tu espacio”</strong>. Si no sale, usa el botón de abajo.</p>
+      <p class="hint">En ordenador verás el modelo 3D; AR solo en móviles compatibles.</p>
     </header>
 
-    <!-- El visor 3D con AR -->
+    <!-- Visor 3D + AR -->
     <model-viewer
-  src="rumi__fortnite_skin__fortnite_x_kpdh.glb"
-  ar
-  ar-modes="scene-viewer webxr quick-look"
-  camera-controls
-  environment-image="neutral"
-  shadow-intensity="1"
-  exposure="1"
-  autoplay>
-  <button slot="ar-button">Ver en tu espacio</button>
-  <div slot="ar-prompt">Mueve el móvil para detectar una superficie…</div>
-</model-viewer>
-    <!-- Botón directo a Scene Viewer (Android) -->
-<p style="text-align:center;margin:16px 0;">
-  <a
-    href="https://arvr.google.com/scene-viewer/1.0?file=https://rayckles.github.io/Reto-XR/rumi__fortnite_skin__fortnite_x_kpdh.glb&mode=ar_only"
-    rel="ar"
-    target="_blank"
-    style="display:inline-block;padding:12px 16px;border-radius:8px;border:1px solid #ddd;text-decoration:none;">
-    Abrir en AR (Android)
-  </a>
-</p>
+      src="https://rayckles.github.io/Reto-XR/rumi__fortnite_skin__fortnite_x_kpdh.glb"
+      ar
+      ar-modes="scene-viewer webxr quick-look"
+      camera-controls
+      environment-image="neutral"
+      shadow-intensity="1"
+      exposure="1"
+      autoplay
+      crossorigin="anonymous">
+        <button slot="ar-button">Ver en tu espacio</button>
+        <div slot="ar-prompt">Mueve el móvil para detectar una superficie…</div>
+    </model-viewer>
 
+    <!-- Botón de respaldo: abre Scene Viewer directamente (Android) -->
+    <p class="center">
+      <a
+        class="btn"
+        rel="ar"
+        target="_blank"
+        href="https://arvr.google.com/scene-viewer/1.0?file=https://rayckles.github.io/Reto-XR/rumi__fortnite_skin__fortnite_x_kpdh.glb&mode=ar_only">
+        Abrir en AR (Android)
+      </a>
+    </p>
   </body>
 </html>
