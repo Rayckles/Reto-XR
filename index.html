@@ -40,16 +40,16 @@
 
     <!-- El visor 3D con AR -->
     <model-viewer
-      src="rumi__fortnite_skin__fortnite_x_kpdh.glb"
-      ar
-      ar-modes="webxr scene-viewer quick-look"
-      camera-controls
-      environment-image="neutral"
-      shadow-intensity="1"
-      exposure="1"
-      autoplay>
-        <button slot="ar-button">Ver en tu espacio</button>
-        <div slot="ar-prompt">Mueve el móvil para detectar una superficie…</div>
-    </model-viewer>
+  src="rumi__fortnite_skin__fortnite_x_kpdh.glb"
+  ar
+  ar-modes="scene-viewer webxr quick-look"
+  camera-controls
+  environment-image="neutral"
+  shadow-intensity="1"
+  exposure="1"
+  autoplay>
+  <button slot="ar-button">Ver en tu espacio</button>
+  <div slot="ar-prompt">Mueve el móvil para detectar una superficie…</div>
+</model-viewer>
   </body>
 </html>
