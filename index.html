@@ -20,41 +20,45 @@
     #credits{ position:fixed; bottom:.8rem; left:.8rem; font-size:.8rem; opacity:.8; }
     #canvas { display:block; width:100vw; height:100vh; }
   </style>
+  
 </head>
 <body>
   <!-- Top UI -->
     <div id="ui">
-    <span style="opacity:.8">V 1.0</span>
+    <span style="opacity:.8">V.1</span>
     <button id="btnReset">Reiniciar</button>
     <button id="btnHelp">Ayuda</button>
   </div>
 
   <!-- Enter AR button injected by ARButton (also provide fallback FAB) -->
-  <button class="fab" id="enterAR">Entrar en AR</button>
+  
 
+  <button class="fab" id="enterAR">Entrar en AR</button>
   <div class="hint" id="hint">Mueve el móvil para encontrar una superficie… toca para colocar · pinza = escala · giro con dos dedos = rotar</div>
   <div class="reticle" id="reticle"></div>
   <div class="toast" id="toast"></div>
   <div id="credits">WebXR • three.js</div>
   <canvas id="canvas"></canvas>
 
+  <!-- Pantalla inicial: un toque en cualquier parte inicia AR (requisito de navegadores) -->
+  </div>
+
   <script type="module">
     import * as THREE from 'https://unpkg.com/three@0.160.1/build/three.module.js';
     import { OrbitControls } from 'https://unpkg.com/three@0.160.1/examples/jsm/controls/OrbitControls.js';
-    import { ARButton } from 'https://unpkg.com/three@0.160.1/examples/jsm/webxr/ARButton.js';
     import { GLTFLoader } from 'https://unpkg.com/three@0.160.1/examples/jsm/loaders/GLTFLoader.js';
 
     // DOM
     const canvas = document.getElementById('canvas');
-const fabEnter = document.getElementById('enterAR');
-const hint = document.getElementById('hint');
-const reticleEl = document.getElementById('reticle');
-const toastEl = document.getElementById('toast');
-const btnReset = document.getElementById('btnReset');
-const btnHelp = document.getElementById('btnHelp');
+    const hint = document.getElementById('hint');
+    const reticleEl = document.getElementById('reticle');
+    const toastEl = document.getElementById('toast');
+    const btnReset = document.getElementById('btnReset');
+    const btnHelp = document.getElementById('btnHelp');
+    
 
-// 🔒 URL fija del modelo (pon aquí el enlace RAW de GitHub)
-const MODEL_URL = 'https://raw.githubusercontent.com/USUARIO/REPO/rama/rumi__fortnite_skin__fortnite_x_kpdh.glb'; // <-- reemplaza USUARIO/REPO/rama
+    // URL fija del modelo
+    const MODEL_URL = 'https://github.com/Rayckles/Reto-XR/raw/refs/heads/main/rumi__fortnite_skin__fortnite_x_kpdh.glb';
 
     // Three basics
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas });
@@ -70,80 +74,61 @@ const MODEL_URL = 'https://raw.githubusercontent.com/USUARIO/REPO/rama/rumi__for
     const hemi = new THREE.HemisphereLight(0xffffff, 0x334155, 1.0); scene.add(hemi);
     const dir = new THREE.DirectionalLight(0xffffff, 0.8); dir.position.set(0.5, 1, 0.3); scene.add(dir);
 
-    // Non‑AR orbit mode (desktop preview)
+    // Desktop preview
     const controls = new OrbitControls(camera, renderer.domElement);
     camera.position.set(0, 1.2, 2.4);
     controls.target.set(0, 1, 0);
     controls.update();
 
-    // Reticle (for placement feedback)
+    // Reticle
     const reticle = new THREE.Mesh(
       new THREE.RingGeometry(0.08, 0.1, 48).rotateX(-Math.PI/2),
       new THREE.MeshBasicMaterial({ color: 0x89f7fe })
     );
     reticle.matrixAutoUpdate = false;
 
-    // Content root for placed objects
+    // Content
     const content = new THREE.Group(); scene.add(content);
 
-    // Ground for desktop preview
+    // Preview ground
     const previewGround = new THREE.Mesh(
       new THREE.PlaneGeometry(10, 10),
       new THREE.MeshStandardMaterial({ color: 0x202833, metalness:0, roughness:1 })
     );
-    previewGround.rotation.x = -Math.PI/2;
-    previewGround.position.y = 0;
-    scene.add(previewGround);
+    previewGround.rotation.x = -Math.PI/2; previewGround.position.y = 0; scene.add(previewGround);
 
-    // Current placed object reference
+    // State
     let placed = null;
+    let modelReady = false;
+    let xrRefSpace = null; let hitTestSource = null; let isAR = false; let lastHit = null;
 
-// Prevenir interacción si el modelo no está listo
-let modelReady = false;
-
-    function makeFallbackCube() {
-      const g = new THREE.BoxGeometry(.3, .3, .3);
-      const m = new THREE.MeshStandardMaterial({ color: 0x6ee7ff, metalness:.1, roughness:.35 });
-      const cube = new THREE.Mesh(g, m);
-      cube.castShadow = true; cube.receiveShadow = true;
-      return cube;
+    function toast(msg, ms=1800){
+      toastEl.textContent = msg; toastEl.style.display = 'block';
+      clearTimeout(toastEl._t); toastEl._t = setTimeout(()=> toastEl.style.display = 'none', ms);
     }
 
-    async function loadModel(url) {
+    async function loadModel(url){
       return new Promise((resolve, reject) => {
         const loader = new GLTFLoader();
         loader.load(url, (gltf)=>{
-          const root = gltf.scene || gltf.scenes[0];
-          resolve(root);
+          const root = gltf.scene || gltf.scenes[0]; resolve(root);
         }, undefined, (e)=> reject(e));
       });
     }
 
-    function toast(msg, ms=1800){
-      toastEl.textContent = msg;
-      toastEl.style.display = 'block';
-      clearTimeout(toastEl._t);
-      toastEl._t = setTimeout(()=> toastEl.style.display = 'none', ms);
-    }
-
-    // Gesture handling (scale/rotate)
+    // Gestures
     let pointers = new Map();
     let baseDistance = 0, baseAngle = 0, startScale = 1, startRotationY = 0;
-
     function onPointerDown(e){ pointers.set(e.pointerId, e); }
     function onPointerMove(e){
-      if(!placed) return; 
-      if(!pointers.has(e.pointerId)) return; 
-      pointers.set(e.pointerId, e);
+      if(!placed) return; if(!pointers.has(e.pointerId)) return; pointers.set(e.pointerId, e);
       if(pointers.size === 2){
         const [p1, p2] = [...pointers.values()];
         const dx = p2.clientX - p1.clientX; const dy = p2.clientY - p1.clientY;
-        const dist = Math.hypot(dx, dy);
-        const angle = Math.atan2(dy, dx);
+        const dist = Math.hypot(dx, dy); const angle = Math.atan2(dy, dx);
         if(!baseDistance){ baseDistance = dist; baseAngle = angle; startScale = placed.scale.x; startRotationY = placed.rotation.y; }
         const scale = THREE.MathUtils.clamp(startScale * (dist/baseDistance), 0.1, 8);
-        placed.scale.setScalar(scale);
-        placed.rotation.y = startRotationY + (angle - baseAngle);
+        placed.scale.setScalar(scale); placed.rotation.y = startRotationY + (angle - baseAngle);
       }
     }
     function onPointerUp(e){ pointers.delete(e.pointerId); if(pointers.size<2){ baseDistance=0; baseAngle=0; } }
@@ -153,15 +138,10 @@ let modelReady = false;
     renderer.domElement.addEventListener('pointerup', onPointerUp);
     renderer.domElement.addEventListener('pointercancel', onPointerUp);
 
-    // AR session & hit‑test
-    let xrRefSpace = null;
-    let hitTestSource = null;
-    let isAR = false;
-
     async function startAR(){
       if(!navigator.xr){ toast('Este navegador no soporta WebXR'); return; }
       const supported = await navigator.xr.isSessionSupported('immersive-ar');
-      if(!supported){ toast('Tu dispositivo no soporta "immersive-ar"'); return; }
+      if(!supported){ toast('Dispositivo sin "immersive-ar"'); return; }
 
       const sessionInit = { requiredFeatures: ['hit-test', 'dom-overlay'], domOverlay: { root: document.body } };
       const session = await navigator.xr.requestSession('immersive-ar', sessionInit);
@@ -169,121 +149,75 @@ let modelReady = false;
       await renderer.xr.setSession(session);
       isAR = true; hint.style.display = 'block'; reticleEl.style.display = 'block';
 
-      // Hit‑test source
+      // Hit test
       const xrViewerSpace = await session.requestReferenceSpace('viewer');
       hitTestSource = await session.requestHitTestSource({ space: xrViewerSpace });
       xrRefSpace = await session.requestReferenceSpace('local');
 
       session.addEventListener('end', ()=>{
-        isAR = false; hint.style.display='none'; reticleEl.style.display='none';
-        scene.remove(reticle);
+        isAR = false; hint.style.display='none'; reticleEl.style.display='none'; scene.remove(reticle);
+        
       });
 
       // Tap to place
       session.addEventListener('select', ()=>{
-  if(!lastHit) return;
-  if(!modelReady){ toast('Espera: cargando modelo…'); return; }
-  if(!placed){ placed = currentModel; if(!content.children.includes(placed)) content.add(placed); }
-  placed.position.setFromMatrixPosition(reticle.matrix);
-  placed.quaternion.setFromRotationMatrix(reticle.matrix);
-  toast('Objeto colocado. Pinza=escala • Dos dedos=girar');
-}); content.add(placed); }
+        if(!lastHit) return; if(!modelReady){ toast('Cargando modelo…'); return; }
+        if(!placed){ placed = currentModel; if(!content.children.includes(placed)) content.add(placed); }
         placed.position.setFromMatrixPosition(reticle.matrix);
         placed.quaternion.setFromRotationMatrix(reticle.matrix);
         toast('Objeto colocado. Pinza=escala • Dos dedos=girar');
       });
 
-      // Add reticle to scene for AR only
+      // Add reticle
       scene.add(reticle);
     }
 
     // Model management
     let currentModel = null;
-
-    async function setModelFromInput(){
-  const url = MODEL_URL.trim();
-  if(!url){ toast('Falta URL del modelo (configura MODEL_URL)'); return; }
-  try{
-    const root = await loadModel(url);
-    root.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
-    if(currentModel) content.remove(currentModel);
-    currentModel = root;
-    modelReady = true;
-    if(!isAR){
-      currentModel.position.set(0, 0, 0);
-      content.add(currentModel);
-    }
-    toast('Modelo cargado ✔️');
-  }catch(err){ console.error(err); toast('Error cargando el modelo (revisa el enlace RAW)'); }
-} });
-          if(currentModel) content.remove(currentModel);
-          currentModel = root;
-          if(!isAR){
-            // show on ground in preview mode
-            currentModel.position.set(0, 0, 0);
-            content.add(currentModel);
-          }
-          toast('Modelo cargado ✔️');
-        } else {
-          // fallback cube
-          if(currentModel) content.remove(currentModel);
-          currentModel = makeFallbackCube();
-          if(!isAR){ currentModel.position.set(0, .15, 0); content.add(currentModel); }
-          toast('Usando cubo por defecto');
-        }
-      }catch(err){ console.error(err); toast('Error cargando el modelo'); }
+    async function setModel(){
+      try{
+        const root = await loadModel(MODEL_URL);
+        root.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+        if(currentModel) content.remove(currentModel);
+        currentModel = root; modelReady = true;
+        if(!isAR){ currentModel.position.set(0,0,0); content.add(currentModel); }
+        toast('Modelo cargado ✔️');
+      }catch(e){ console.error(e); toast('Error cargando el modelo'); }
     }
 
-    // (carga automática — sin botón) 
-    btnReset.addEventListener('click', ()=>{ content.clear(); placed=null; currentModel=null; modelReady=false; setModelFromInput(); toast('Escena reiniciada'); }); placed=null; currentModel=null; toast('Escena reiniciada'); });
+    btnReset.addEventListener('click', ()=>{ content.clear(); placed=null; currentModel=null; modelReady=false; setModel(); toast('Escena reiniciada'); });
     btnHelp.addEventListener('click', ()=>{
       alert('Cómo usar:
 
-1) Pulsa "Entrar en AR" (móvil Android/Chrome, HTTPS).
-2) Mueve el dispositivo para escanear superficies (aparecerá una diana).
-3) Toca la pantalla para colocar el objeto (modelo bloqueado por el autor).
+1) Toque la pantalla para entrar en AR (requisito WebXR).
+2) Mueva el dispositivo para escanear superficies (verá una diana).
+3) Toque para colocar el modelo.
 4) Pinza para escalar, dos dedos para girar.');
     });
 
-    // Enter AR via ARButton (inserts a native-styled button); also bind our FAB
-    const arButton = ARButton.createButton(renderer, { requiredFeatures: ['hit-test', 'dom-overlay'], domOverlay: { root: document.body } });
-    arButton.style.display = 'none'; // hide default, we use custom FAB
-    document.body.appendChild(arButton);
-    fabEnter.addEventListener('click', ()=> arButton.click());
-
-    // Hit‑test loop
-    let lastHit = null;
+    // Anim loop
     renderer.setAnimationLoop((t, frame)=>{
       if(isAR && frame){
-        const refSpace = xrRefSpace;
         const hitTestResults = hitTestSource ? frame.getHitTestResults(hitTestSource) : [];
         if(hitTestResults.length){
-          const pose = hitTestResults[0].getPose(refSpace);
-          if(pose){
-            reticle.visible = true; reticleEl.style.display='block';
-            reticle.matrix.fromArray(pose.transform.matrix);
-            lastHit = pose;
-          }
-        } else {
-          reticle.visible = false; reticleEl.style.display='none';
-          lastHit = null;
-        }
+          const pose = hitTestResults[0].getPose(xrRefSpace);
+          if(pose){ reticle.visible = true; reticleEl.style.display='block'; reticle.matrix.fromArray(pose.transform.matrix); lastHit = pose; }
+        } else { reticle.visible = false; reticleEl.style.display='none'; lastHit = null; }
       }
       renderer.render(scene, camera);
     });
 
     // Resize
     window.addEventListener('resize', ()=>{
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // Initial
-    setModelFromInput();
+    // Boot
+    await setModel();
 
+    // Botón visible que inicia AR
+    const enterBtn = document.getElementById('enterAR');
+    enterBtn.addEventListener('click', startAR);
   </script>
 </body>
-</html>
-
 </html>
