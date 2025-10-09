@@ -1,237 +1,211 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>AR WebXR — Starter</title>
-  <style>
-    html, body { margin:0; height:100%; background:#0b0e13; color:#e7ecef; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
-    #ui { position: fixed; inset: 0 0 auto 0; display:flex; gap:.5rem; align-items:center; padding:.6rem .8rem; background: linear-gradient(180deg, rgba(11,14,19,.85), rgba(11,14,19,.2) 70%, transparent); z-index: 10; }
-    #ui input[type="text"]{ flex:1; min-width:0; background:#151a22; border:1px solid #2a3441; color:#e7ecef; padding:.55rem .7rem; border-radius:.8rem; outline:none; }
-    #ui button, .fab { background:#1d2430; color:#e7ecef; border:1px solid #2a3441; padding:.55rem .8rem; border-radius:.9rem; cursor:pointer; font-weight:600; letter-spacing:.2px; }
-    #ui button:hover, .fab:hover { filter:brightness(1.1); }
-    .fab { position: fixed; right:.8rem; bottom:.8rem; z-index: 11; padding:.7rem 1rem; }
-    .hint { position: fixed; left:50%; transform: translateX(-50%); bottom:5.8rem; background: rgba(0,0,0,.45); padding:.5rem .7rem; border-radius:.6rem; font-size:.9rem; backdrop-filter: blur(4px); border:1px solid rgba(255,255,255,.1); display:none; }
-    .reticle { position:fixed; left:50%; top:50%; transform: translate(-50%, -50%); width:56px; height:56px; border-radius:50%; pointer-events:none; display:none; }
-    .reticle::before, .reticle::after { content:""; position:absolute; inset:0; border-radius:50%; }
-    .reticle::before { border:2px dashed #89f7fe; opacity:.8; }
-    .reticle::after { border:2px solid #89f7fe33; transform: scale(.6); }
-    .toast { position: fixed; left:50%; transform: translateX(-50%); top:.8rem; background:#111722; color:#e7ecef; padding:.55rem .8rem; border-radius:.7rem; border:1px solid #2a3441; display:none; z-index: 50; }
-    #credits{ position:fixed; bottom:.8rem; left:.8rem; font-size:.8rem; opacity:.8; }
-    #canvas { display:block; width:100vw; height:100vh; }
-  </style>
-  
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR con WebXR</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        #ar-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 20px 40px;
+            font-size: 20px;
+            background: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        #ar-button:hover {
+            background: #357ae8;
+        }
+        #ar-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 999;
+            max-width: 300px;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+    </style>
 </head>
 <body>
-  <!-- Top UI -->
-    <div id="ui">
-    <span style="opacity:.8">V 1.2</span>
-    <button id="btnReset">Reiniciar</button>
-    <button id="btnHelp">Ayuda</button>
-  </div>
-
-  <!-- Enter AR button injected by ARButton (also provide fallback FAB) -->
-  
-
-  <button class="fab" id="enterAR">Entrar en AR</button>
-  <div class="hint" id="hint">Mueve el móvil para encontrar una superficie… toca para colocar · pinza = escala · giro con dos dedos = rotar</div>
-  <div class="reticle" id="reticle"></div>
-  <div class="toast" id="toast"></div>
-  <div id="credits">WebXR • three.js</div>
-  <canvas id="canvas"></canvas>
-
-  <!-- Pantalla inicial: un toque en cualquier parte inicia AR (requisito de navegadores) -->
-  </div>
-
-  <script type="module">
-    import * as THREE from 'https://unpkg.com/three@0.160.1/build/three.module.js';
-    import { OrbitControls } from 'https://unpkg.com/three@0.160.1/examples/jsm/controls/OrbitControls.js';
-    import { GLTFLoader } from 'https://unpkg.com/three@0.160.1/examples/jsm/loaders/GLTFLoader.js';
-
-    // DOM
-    const canvas = document.getElementById('canvas');
-    const hint = document.getElementById('hint');
-    const reticleEl = document.getElementById('reticle');
-    const toastEl = document.getElementById('toast');
-    const btnReset = document.getElementById('btnReset');
-    const btnHelp = document.getElementById('btnHelp');
+    <div id="info">Cargando recursos...</div>
+    <button id="ar-button" disabled>Iniciar AR</button>
     
-
-    // URL fija del modelo
-    // Sugerencia: jsDelivr suele evitar problemas CORS
-    const MODEL_URL = 'https://cdn.jsdelivr.net/gh/Rayckles/Reto-XR@main/rumi__fortnite_skin__fortnite_x_kpdh.glb';
-
-    // Three basics
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.xr.enabled = true;
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 50);
-
-    // Lights
-    const hemi = new THREE.HemisphereLight(0xffffff, 0x334155, 1.0); scene.add(hemi);
-    const dir = new THREE.DirectionalLight(0xffffff, 0.8); dir.position.set(0.5, 1, 0.3); scene.add(dir);
-
-    // Desktop preview
-    const controls = new OrbitControls(camera, renderer.domElement);
-    camera.position.set(0, 1.2, 2.4);
-    controls.target.set(0, 1, 0);
-    controls.update();
-
-    // Reticle
-    const reticle = new THREE.Mesh(
-      new THREE.RingGeometry(0.08, 0.1, 48).rotateX(-Math.PI/2),
-      new THREE.MeshBasicMaterial({ color: 0x89f7fe })
-    );
-    reticle.matrixAutoUpdate = false;
-
-    // Content
-    const content = new THREE.Group(); scene.add(content);
-
-    // Preview ground
-    const previewGround = new THREE.Mesh(
-      new THREE.PlaneGeometry(10, 10),
-      new THREE.MeshStandardMaterial({ color: 0x202833, metalness:0, roughness:1 })
-    );
-    previewGround.rotation.x = -Math.PI/2; previewGround.position.y = 0; scene.add(previewGround);
-
-    // State
-    let placed = null;
-    let modelReady = false;
-    let xrRefSpace = null; let hitTestSource = null; let isAR = false; let lastHit = null;
-
-    function toast(msg, ms=1800){
-      toastEl.textContent = msg; toastEl.style.display = 'block';
-      clearTimeout(toastEl._t); toastEl._t = setTimeout(()=> toastEl.style.display = 'none', ms);
-    }
-
-    async function loadModel(url){
-      return new Promise((resolve, reject) => {
-        const loader = new GLTFLoader();
-        loader.load(url, (gltf)=>{
-          const root = gltf.scene || gltf.scenes[0]; resolve(root);
-        }, undefined, (e)=> reject(e));
-      });
-    }
-
-    // Gestures
-    let pointers = new Map();
-    let baseDistance = 0, baseAngle = 0, startScale = 1, startRotationY = 0;
-    function onPointerDown(e){ pointers.set(e.pointerId, e); }
-    function onPointerMove(e){
-      if(!placed) return; if(!pointers.has(e.pointerId)) return; pointers.set(e.pointerId, e);
-      if(pointers.size === 2){
-        const [p1, p2] = [...pointers.values()];
-        const dx = p2.clientX - p1.clientX; const dy = p2.clientY - p1.clientY;
-        const dist = Math.hypot(dx, dy); const angle = Math.atan2(dy, dx);
-        if(!baseDistance){ baseDistance = dist; baseAngle = angle; startScale = placed.scale.x; startRotationY = placed.rotation.y; }
-        const scale = THREE.MathUtils.clamp(startScale * (dist/baseDistance), 0.1, 8);
-        placed.scale.setScalar(scale); placed.rotation.y = startRotationY + (angle - baseAngle);
-      }
-    }
-    function onPointerUp(e){ pointers.delete(e.pointerId); if(pointers.size<2){ baseDistance=0; baseAngle=0; } }
-
-    renderer.domElement.addEventListener('pointerdown', onPointerDown);
-    renderer.domElement.addEventListener('pointermove', onPointerMove);
-    renderer.domElement.addEventListener('pointerup', onPointerUp);
-    renderer.domElement.addEventListener('pointercancel', onPointerUp);
-
-    async function startAR(){
-      if(!navigator.xr){ toast('Este navegador no soporta WebXR'); return; }
-      let supported = false;
-      try { supported = await navigator.xr.isSessionSupported('immersive-ar'); } catch {}
-      if(!supported){ toast('Este dispositivo/navegador no soporta AR'); return; }
-
-      const sessionInit = { requiredFeatures: ['hit-test'], optionalFeatures: ['dom-overlay'], domOverlay: { root: document.body } };
-      let session;
-      try {
-        session = await navigator.xr.requestSession('immersive-ar', sessionInit);
-      } catch (e) {
-        console.error('requestSession error', e);
-        toast('No se pudo iniciar AR: ' + (e?.message || e));
-        return;
-      }
-      renderer.xr.setReferenceSpaceType('local');
-      await renderer.xr.setSession(session);
-      isAR = true; hint.style.display = 'block'; reticleEl.style.display = 'block';
-
-      // Hit test
-      const xrViewerSpace = await session.requestReferenceSpace('viewer');
-      hitTestSource = await session.requestHitTestSource({ space: xrViewerSpace });
-      xrRefSpace = await session.requestReferenceSpace('local');
-
-      session.addEventListener('end', ()=>{
-        isAR = false; hint.style.display='none'; reticleEl.style.display='none'; scene.remove(reticle);
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script type="module">
+        // Importar GLTFLoader
+        import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/GLTFLoader.js';
         
-      });
-
-      // Tap to place
-      session.addEventListener('select', ()=>{
-        if(!lastHit) return;
-        if(!modelReady){ toast('Cargando modelo…'); return; }
-        if(!placed){ placed = currentModel; if(!content.children.includes(placed)) content.add(placed); }
-        placed.position.setFromMatrixPosition(reticle.matrix);
-        placed.quaternion.setFromRotationMatrix(reticle.matrix);
-        toast('Objeto colocado. Pinza=escala • Dos dedos=girar');
-      });
-
-      // Add reticle
-      scene.add(reticle);
-    }
-
-    // Model management
-    let currentModel = null;
-    async function setModel(){
-      try{
-        const root = await loadModel(MODEL_URL);
-        root.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
-        if(currentModel) content.remove(currentModel);
-        currentModel = root; modelReady = true;
-        if(!isAR){ currentModel.position.set(0,0,0); content.add(currentModel); }
-        toast('Modelo cargado ✔️');
-      }catch(e){ console.error(e); toast('Error cargando el modelo'); }
-    }
-
-    btnReset.addEventListener('click', ()=>{ content.clear(); placed=null; currentModel=null; modelReady=false; setModel(); toast('Escena reiniciada'); });
-    btnHelp.addEventListener('click', ()=>{
-      alert('Cómo usar:
-
-1) Toque la pantalla para entrar en AR (requisito WebXR).
-2) Mueva el dispositivo para escanear superficies (verá una diana).
-3) Toque para colocar el modelo.
-4) Pinza para escalar, dos dedos para girar.');
-    });
-
-    // Anim loop
-    renderer.setAnimationLoop((t, frame)=>{
-      if(isAR && frame){
-        const hitTestResults = hitTestSource ? frame.getHitTestResults(hitTestSource) : [];
-        if(hitTestResults.length){
-          const pose = hitTestResults[0].getPose(xrRefSpace);
-          if(pose){ reticle.visible = true; reticleEl.style.display='block'; reticle.matrix.fromArray(pose.transform.matrix); lastHit = pose; }
-        } else { reticle.visible = false; reticleEl.style.display='none'; lastHit = null; }
-      }
-      renderer.render(scene, camera);
-    });
-
-    // Resize
-    window.addEventListener('resize', ()=>{
-      camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-
-    // Boot
-    await setModel();
-
-    // Botón visible que inicia AR
-    const enterBtn = document.getElementById('enterAR');
-    enterBtn.addEventListener('click', (e)=>{
-      e.preventDefault();
-      e.stopPropagation();
-      startAR();
-    }, { passive: true });
-  </script>
+        let scene, camera, renderer, model;
+        let xrSession = null;
+        let xrRefSpace = null;
+        const arButton = document.getElementById('ar-button');
+        const info = document.getElementById('info');
+        
+        // URL de tu modelo en GitHub (ajusta con tu usuario y repositorio)
+        const modelURL = 'https://github.com/Rayckles/Reto-XR/raw/refs/heads/main/rumi__fortnite_skin__fortnite_x_kpdh.glb';
+        
+        function updateInfo(message) {
+            info.textContent = message;
+        }
+        
+        function init() {
+            // Crear escena
+            scene = new THREE.Scene();
+            
+            // Crear cámara
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            // Crear renderer
+            renderer = new THREE.WebGLRenderer({ 
+                alpha: true, 
+                antialias: true 
+            });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.xr.enabled = true;
+            document.body.appendChild(renderer.domElement);
+            
+            // Añadir luz ambiental
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+            scene.add(ambientLight);
+            
+            // Añadir luz direccional
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            directionalLight.position.set(0, 5, 5);
+            scene.add(directionalLight);
+            
+            // Cargar modelo
+            const loader = new GLTFLoader();
+            updateInfo('Cargando modelo 3D...');
+            
+            loader.load(
+                modelURL,
+                function(gltf) {
+                    model = gltf.scene;
+                    
+                    // Ajustar escala y posición del modelo
+                    model.scale.set(0.5, 0.5, 0.5);
+                    model.position.set(0, 0, -1.5);
+                    
+                    scene.add(model);
+                    updateInfo('Modelo cargado. Listo para AR.');
+                    checkARSupport();
+                },
+                function(xhr) {
+                    const percent = (xhr.loaded / xhr.total * 100).toFixed(0);
+                    updateInfo(`Cargando modelo: ${percent}%`);
+                },
+                function(error) {
+                    updateInfo('Error al cargar el modelo. Verifica la URL.');
+                    console.error('Error cargando modelo:', error);
+                }
+            );
+            
+            // Manejar redimensionamiento
+            window.addEventListener('resize', onWindowResize);
+        }
+        
+        function checkARSupport() {
+            if ('xr' in navigator) {
+                navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+                    if (supported) {
+                        arButton.disabled = false;
+                        arButton.textContent = 'Iniciar AR';
+                        updateInfo('AR disponible. Pulsa el botón para empezar.');
+                    } else {
+                        updateInfo('AR no soportado en este dispositivo.');
+                        arButton.textContent = 'AR no disponible';
+                    }
+                });
+            } else {
+                updateInfo('WebXR no disponible en este navegador.');
+                arButton.textContent = 'WebXR no disponible';
+            }
+        }
+        
+        arButton.addEventListener('click', async () => {
+            if (xrSession === null) {
+                try {
+                    xrSession = await navigator.xr.requestSession('immersive-ar', {
+                        requiredFeatures: ['hit-test', 'dom-overlay'],
+                        domOverlay: { root: document.body }
+                    });
+                    
+                    await onSessionStarted();
+                } catch (error) {
+                    updateInfo('Error al iniciar AR: ' + error.message);
+                    console.error('Error:', error);
+                }
+            } else {
+                xrSession.end();
+            }
+        });
+        
+        async function onSessionStarted() {
+            xrSession.addEventListener('end', onSessionEnded);
+            
+            await renderer.xr.setSession(xrSession);
+            
+            xrRefSpace = await xrSession.requestReferenceSpace('local');
+            
+            arButton.textContent = 'Detener AR';
+            info.style.display = 'none';
+            
+            renderer.setAnimationLoop(render);
+        }
+        
+        function onSessionEnded() {
+            xrSession = null;
+            arButton.textContent = 'Iniciar AR';
+            info.style.display = 'block';
+            updateInfo('Sesión AR finalizada.');
+            
+            renderer.setAnimationLoop(null);
+        }
+        
+        function render(timestamp, frame) {
+            if (frame && model) {
+                // Rotar el modelo suavemente
+                model.rotation.y += 0.01;
+            }
+            
+            renderer.render(scene, camera);
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        // Inicializar cuando cargue la página
+        init();
+    </script>
 </body>
 </html>
