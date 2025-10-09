@@ -25,7 +25,7 @@
 <body>
   <!-- Top UI -->
     <div id="ui">
-    <span style="opacity:.8">V.1.1</span>
+    <span style="opacity:.8">V 1.2</span>
     <button id="btnReset">Reiniciar</button>
     <button id="btnHelp">Ayuda</button>
   </div>
@@ -58,7 +58,8 @@
     
 
     // URL fija del modelo
-    const MODEL_URL = 'https://github.com/Rayckles/Reto-XR/raw/refs/heads/main/rumi__fortnite_skin__fortnite_x_kpdh.glb';
+    // Sugerencia: jsDelivr suele evitar problemas CORS
+    const MODEL_URL = 'https://cdn.jsdelivr.net/gh/Rayckles/Reto-XR@main/rumi__fortnite_skin__fortnite_x_kpdh.glb';
 
     // Three basics
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas });
@@ -140,11 +141,19 @@
 
     async function startAR(){
       if(!navigator.xr){ toast('Este navegador no soporta WebXR'); return; }
-      const supported = await navigator.xr.isSessionSupported('immersive-ar');
-      if(!supported){ toast('Dispositivo sin "immersive-ar"'); return; }
+      let supported = false;
+      try { supported = await navigator.xr.isSessionSupported('immersive-ar'); } catch {}
+      if(!supported){ toast('Este dispositivo/navegador no soporta AR'); return; }
 
-      const sessionInit = { requiredFeatures: ['hit-test', 'dom-overlay'], domOverlay: { root: document.body } };
-      const session = await navigator.xr.requestSession('immersive-ar', sessionInit);
+      const sessionInit = { requiredFeatures: ['hit-test'], optionalFeatures: ['dom-overlay'], domOverlay: { root: document.body } };
+      let session;
+      try {
+        session = await navigator.xr.requestSession('immersive-ar', sessionInit);
+      } catch (e) {
+        console.error('requestSession error', e);
+        toast('No se pudo iniciar AR: ' + (e?.message || e));
+        return;
+      }
       renderer.xr.setReferenceSpaceType('local');
       await renderer.xr.setSession(session);
       isAR = true; hint.style.display = 'block'; reticleEl.style.display = 'block';
@@ -161,7 +170,8 @@
 
       // Tap to place
       session.addEventListener('select', ()=>{
-        if(!lastHit) return; if(!modelReady){ toast('Cargando modelo…'); return; }
+        if(!lastHit) return;
+        if(!modelReady){ toast('Cargando modelo…'); return; }
         if(!placed){ placed = currentModel; if(!content.children.includes(placed)) content.add(placed); }
         placed.position.setFromMatrixPosition(reticle.matrix);
         placed.quaternion.setFromRotationMatrix(reticle.matrix);
@@ -217,7 +227,11 @@
 
     // Botón visible que inicia AR
     const enterBtn = document.getElementById('enterAR');
-    enterBtn.addEventListener('click', startAR);
+    enterBtn.addEventListener('click', (e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      startAR();
+    }, { passive: true });
   </script>
 </body>
 </html>
