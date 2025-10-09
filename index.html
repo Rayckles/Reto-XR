@@ -3,241 +3,276 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR con WebXR</title>
+    <title>AR con Cámara</title>
     <style>
-        body {
+        * {
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
+        }
+        body {
             overflow: hidden;
             font-family: Arial, sans-serif;
-            background: #000;
         }
-        #container {
-            width: 100vw;
-            height: 100vh;
-            position: relative;
+        #video {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+        }
+        #canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
         }
         #ar-button {
-            position: absolute;
-            bottom: 30px;
+            position: fixed;
+            bottom: 40px;
             left: 50%;
             transform: translateX(-50%);
-            padding: 18px 45px;
-            font-size: 18px;
+            padding: 20px 50px;
+            font-size: 20px;
             background: #4285f4;
             color: white;
             border: none;
-            border-radius: 30px;
+            border-radius: 50px;
             cursor: pointer;
             z-index: 1000;
-            box-shadow: 0 4px 12px rgba(66, 133, 244, 0.5);
+            box-shadow: 0 6px 20px rgba(66, 133, 244, 0.6);
             font-weight: bold;
+            transition: all 0.3s;
         }
         #ar-button:active {
             background: #357ae8;
             transform: translateX(-50%) scale(0.95);
         }
         #info {
-            position: absolute;
-            top: 20px;
+            position: fixed;
+            top: 30px;
             left: 50%;
             transform: translateX(-50%);
             color: white;
             background: rgba(0,0,0,0.8);
-            padding: 12px 20px;
-            border-radius: 20px;
-            font-size: 14px;
+            padding: 15px 25px;
+            border-radius: 25px;
+            font-size: 16px;
             z-index: 999;
             text-align: center;
-            max-width: 80%;
-        }
-        canvas {
-            display: block;
-            width: 100vw;
-            height: 100vh;
+            max-width: 85%;
+            font-weight: 500;
         }
     </style>
 </head>
 <body>
-    <div id="container">
-        <div id="info">Preparando AR...</div>
-        <button id="ar-button">Iniciar AR</button>
-    </div>
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+    <div id="info">Toca el botón para iniciar AR</div>
+    <button id="ar-button">Iniciar AR</button>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script type="module">
-        import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/GLTFLoader.js';
-        
-        let scene, camera, renderer, model;
-        let xrSession = null;
-        let xrRefSpace = null;
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
         const arButton = document.getElementById('ar-button');
         const info = document.getElementById('info');
         
-        // URL de tu modelo - CAMBIA ESTO por tu URL real de GitHub
-        // Formato: https://raw.githubusercontent.com/USUARIO/REPOSITORIO/RAMA/rumi__fortnite_skin__fortnite_x_kpdh.glb
-        const modelURL = 'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/Duck/glTF-Binary/Duck.glb';
+        let scene, camera, renderer, model;
+        let isARActive = false;
+        let stream = null;
+        
+        // URL del modelo - CAMBIA ESTO POR TU URL DE GITHUB
+        const modelURL = 'https://github.com/Rayckles/Reto-XR/raw/refs/heads/main/rumi__fortnite_skin__fortnite_x_kpdh.glb';
         
         function updateInfo(message) {
             info.textContent = message;
             console.log(message);
         }
         
-        async function init() {
-            updateInfo('Inicializando...');
-            
-            // Crear escena
+        function initThreeJS() {
+            // Escena
             scene = new THREE.Scene();
             
-            // Crear cámara
-            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+            // Cámara
+            camera = new THREE.PerspectiveCamera(
+                75, 
+                window.innerWidth / window.innerHeight, 
+                0.1, 
+                1000
+            );
+            camera.position.set(0, 0, 0);
             
-            // Crear renderer
+            // Renderer
             renderer = new THREE.WebGLRenderer({ 
-                alpha: true, 
+                canvas: canvas,
+                alpha: true,
                 antialias: true 
             });
-            renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.xr.enabled = true;
-            document.body.appendChild(renderer.domElement);
+            renderer.setPixelRatio(window.devicePixelRatio);
             
             // Luces
-            const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-            light.position.set(0.5, 1, 0.25);
-            scene.add(light);
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
+            directionalLight.position.set(1, 1, 1);
+            scene.add(directionalLight);
+            
+            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+            directionalLight2.position.set(-1, -1, -1);
+            scene.add(directionalLight2);
             
             // Cargar modelo
-            updateInfo('Cargando modelo...');
-            const loader = new GLTFLoader();
+            loadModel();
             
+            // Resize
+            window.addEventListener('resize', onResize);
+        }
+        
+        function loadModel() {
+            updateInfo('Cargando modelo 3D...');
+            const loader = new THREE.GLTFLoader();
+            
+            loader.load(
+                modelURL,
+                function(gltf) {
+                    model = gltf.scene;
+                    
+                    // Calcular tamaño y centrar
+                    const box = new THREE.Box3().setFromObject(model);
+                    const center = box.getCenter(new THREE.Vector3());
+                    const size = box.getSize(new THREE.Vector3());
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    const scale = 1 / maxDim;
+                    
+                    model.scale.setScalar(scale);
+                    
+                    // Centrar el modelo
+                    model.position.x = -center.x * scale;
+                    model.position.y = -center.y * scale - 0.5;
+                    model.position.z = -3;
+                    
+                    scene.add(model);
+                    updateInfo('¡Modelo cargado! Toca para iniciar AR');
+                },
+                function(xhr) {
+                    const percent = Math.round((xhr.loaded / xhr.total) * 100);
+                    updateInfo('Cargando: ' + percent + '%');
+                },
+                function(error) {
+                    console.error('Error cargando modelo:', error);
+                    updateInfo('Usando cubo de prueba');
+                    
+                    // Crear cubo como respaldo
+                    const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+                    const material = new THREE.MeshPhongMaterial({ 
+                        color: 0x00ff00,
+                        shininess: 100
+                    });
+                    model = new THREE.Mesh(geometry, material);
+                    model.position.set(0, 0, -3);
+                    scene.add(model);
+                }
+            );
+        }
+        
+        async function startCamera() {
             try {
-                const gltf = await new Promise((resolve, reject) => {
-                    loader.load(
-                        modelURL,
-                        resolve,
-                        (xhr) => {
-                            const percent = Math.round((xhr.loaded / xhr.total) * 100);
-                            updateInfo(`Cargando: ${percent}%`);
-                        },
-                        reject
-                    );
-                });
+                updateInfo('Activando cámara...');
                 
-                model = gltf.scene;
+                const constraints = {
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                };
                 
-                // Centrar y escalar modelo
-                const box = new THREE.Box3().setFromObject(model);
-                const center = box.getCenter(new THREE.Vector3());
-                const size = box.getSize(new THREE.Vector3());
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
                 
-                const maxDim = Math.max(size.x, size.y, size.z);
-                const scale = 0.3 / maxDim;
-                
-                model.scale.setScalar(scale);
-                model.position.set(-center.x * scale, -center.y * scale, -1);
-                
-                scene.add(model);
-                
-                updateInfo('¡Modelo cargado! Toca el botón');
-                checkARSupport();
+                video.onloadedmetadata = function() {
+                    video.play();
+                    updateInfo('¡Cámara activa!');
+                    startAR();
+                };
                 
             } catch (error) {
-                updateInfo('Error cargando modelo');
-                console.error('Error:', error);
-                
-                // Crear cubo de respaldo
-                const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-                const material = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
-                model = new THREE.Mesh(geometry, material);
-                model.position.set(0, 0, -1);
-                scene.add(model);
-                
-                updateInfo('Usando cubo de prueba');
-                checkARSupport();
+                updateInfo('Error: No se puede acceder a la cámara');
+                console.error('Error cámara:', error);
+                alert('Por favor, permite el acceso a la cámara');
             }
-            
-            window.addEventListener('resize', onWindowResize);
         }
         
-        function checkARSupport() {
-            if (!('xr' in navigator)) {
-                updateInfo('WebXR no disponible');
-                arButton.disabled = true;
-                return;
-            }
-            
-            navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-                if (supported) {
-                    updateInfo('¡Listo para AR!');
-                    arButton.disabled = false;
-                } else {
-                    updateInfo('AR no soportado');
-                    arButton.disabled = true;
-                }
-            }).catch(err => {
-                updateInfo('Error verificando AR');
-                console.error(err);
-            });
-        }
-        
-        arButton.addEventListener('click', async () => {
-            if (xrSession === null) {
-                updateInfo('Iniciando AR...');
-                try {
-                    const sessionInit = {
-                        requiredFeatures: ['local'],
-                        optionalFeatures: ['dom-overlay'],
-                        domOverlay: { root: document.body }
-                    };
-                    
-                    xrSession = await navigator.xr.requestSession('immersive-ar', sessionInit);
-                    onSessionStarted();
-                    
-                } catch (error) {
-                    updateInfo('Error: ' + error.message);
-                    console.error('Error AR:', error);
-                }
-            } else {
-                xrSession.end();
-            }
-        });
-        
-        function onSessionStarted() {
-            xrSession.addEventListener('end', onSessionEnded);
-            
-            renderer.xr.setSession(xrSession);
+        function startAR() {
+            isARActive = true;
             arButton.textContent = 'Detener AR';
-            updateInfo('AR activo');
+            info.style.background = 'rgba(0,200,0,0.8)';
+            updateInfo('AR Activo - Mueve el móvil');
             
-            xrSession.requestReferenceSpace('local').then((refSpace) => {
-                xrRefSpace = refSpace;
-                renderer.setAnimationLoop(render);
-            });
+            animate();
         }
         
-        function onSessionEnded() {
-            xrSession.removeEventListener('end', onSessionEnded);
-            xrSession = null;
+        function stopAR() {
+            isARActive = false;
             arButton.textContent = 'Iniciar AR';
-            updateInfo('AR detenido');
-            renderer.setAnimationLoop(null);
+            info.style.background = 'rgba(0,0,0,0.8)';
+            updateInfo('AR Detenido');
+            
+            if (stream) {
+                stream.getTracks().forEach(function(track) {
+                    track.stop();
+                });
+                stream = null;
+            }
+            
+            video.srcObject = null;
         }
         
-        function render(timestamp, frame) {
+        function animate() {
+            if (!isARActive) return;
+            
+            requestAnimationFrame(animate);
+            
             if (model) {
-                model.rotation.y = timestamp / 1000;
+                // Rotar modelo suavemente
+                model.rotation.y += 0.01;
             }
+            
             renderer.render(scene, camera);
         }
         
-        function onWindowResize() {
+        function onResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
         
-        init();
+        // Evento del botón
+        arButton.addEventListener('click', function() {
+            if (!isARActive) {
+                startCamera();
+            } else {
+                stopAR();
+            }
+        });
+        
+        // Inicializar Three.js cuando cargue
+        window.addEventListener('load', function() {
+            initThreeJS();
+        });
+    </script>
+</body>
+</html>
     </script>
 </body>
 </html>
