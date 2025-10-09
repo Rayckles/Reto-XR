@@ -23,9 +23,8 @@
 </head>
 <body>
   <!-- Top UI -->
-  <div id="ui">
-    <input id="modelUrl" type="text" placeholder="URL .glb/.gltf (opcional) — deja vacío para usar un cubo" />
-    <button id="btnLoad">Cargar modelo</button>
+    <div id="ui">
+    <span style="opacity:.8">Modelo bloqueado por el autor</span>
     <button id="btnReset">Reiniciar</button>
     <button id="btnHelp">Ayuda</button>
   </div>
@@ -47,14 +46,15 @@
 
     // DOM
     const canvas = document.getElementById('canvas');
-    const fabEnter = document.getElementById('enterAR');
-    const hint = document.getElementById('hint');
-    const reticleEl = document.getElementById('reticle');
-    const toastEl = document.getElementById('toast');
-    const btnLoad = document.getElementById('btnLoad');
-    const btnReset = document.getElementById('btnReset');
-    const btnHelp = document.getElementById('btnHelp');
-    const modelUrlInput = document.getElementById('modelUrl');
+const fabEnter = document.getElementById('enterAR');
+const hint = document.getElementById('hint');
+const reticleEl = document.getElementById('reticle');
+const toastEl = document.getElementById('toast');
+const btnReset = document.getElementById('btnReset');
+const btnHelp = document.getElementById('btnHelp');
+
+// 🔒 URL fija del modelo (pon aquí el enlace RAW de GitHub)
+const MODEL_URL = 'https://raw.githubusercontent.com/USUARIO/REPO/rama/rumi__fortnite_skin__fortnite_x_kpdh.glb'; // <-- reemplaza USUARIO/REPO/rama
 
     // Three basics
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas });
@@ -97,6 +97,9 @@
 
     // Current placed object reference
     let placed = null;
+
+// Prevenir interacción si el modelo no está listo
+let modelReady = false;
 
     function makeFallbackCube() {
       const g = new THREE.BoxGeometry(.3, .3, .3);
@@ -178,9 +181,13 @@
 
       // Tap to place
       session.addEventListener('select', ()=>{
-        if(!lastHit) return;
-        // Place or move the object to hit pose
-        if(!placed){ placed = currentModel || makeFallbackCube(); content.add(placed); }
+  if(!lastHit) return;
+  if(!modelReady){ toast('Espera: cargando modelo…'); return; }
+  if(!placed){ placed = currentModel; if(!content.children.includes(placed)) content.add(placed); }
+  placed.position.setFromMatrixPosition(reticle.matrix);
+  placed.quaternion.setFromRotationMatrix(reticle.matrix);
+  toast('Objeto colocado. Pinza=escala • Dos dedos=girar');
+}); content.add(placed); }
         placed.position.setFromMatrixPosition(reticle.matrix);
         placed.quaternion.setFromRotationMatrix(reticle.matrix);
         toast('Objeto colocado. Pinza=escala • Dos dedos=girar');
@@ -194,11 +201,21 @@
     let currentModel = null;
 
     async function setModelFromInput(){
-      const url = modelUrlInput.value.trim();
-      try{
-        if(url){
-          const root = await loadModel(url);
-          root.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+  const url = MODEL_URL.trim();
+  if(!url){ toast('Falta URL del modelo (configura MODEL_URL)'); return; }
+  try{
+    const root = await loadModel(url);
+    root.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+    if(currentModel) content.remove(currentModel);
+    currentModel = root;
+    modelReady = true;
+    if(!isAR){
+      currentModel.position.set(0, 0, 0);
+      content.add(currentModel);
+    }
+    toast('Modelo cargado ✔️');
+  }catch(err){ console.error(err); toast('Error cargando el modelo (revisa el enlace RAW)'); }
+} });
           if(currentModel) content.remove(currentModel);
           currentModel = root;
           if(!isAR){
@@ -217,10 +234,15 @@
       }catch(err){ console.error(err); toast('Error cargando el modelo'); }
     }
 
-    btnLoad.addEventListener('click', setModelFromInput);
-    btnReset.addEventListener('click', ()=>{ content.clear(); placed=null; currentModel=null; toast('Escena reiniciada'); });
+    // (carga automática — sin botón) 
+    btnReset.addEventListener('click', ()=>{ content.clear(); placed=null; currentModel=null; modelReady=false; setModelFromInput(); toast('Escena reiniciada'); }); placed=null; currentModel=null; toast('Escena reiniciada'); });
     btnHelp.addEventListener('click', ()=>{
-      alert('Cómo usar:\n\n1) Pulsa "Entrar en AR" (móvil Android/Chrome, HTTPS).\n2) Mueve el dispositivo para escanear superficies (aparecerá una diana).\n3) Toca la pantalla para colocar el objeto.\n4) Gesto de pinza para escalar, dos dedos para girar.\n5) (Opcional) Pega una URL .glb/.gltf y pulsa "Cargar modelo".');
+      alert('Cómo usar:
+
+1) Pulsa "Entrar en AR" (móvil Android/Chrome, HTTPS).
+2) Mueve el dispositivo para escanear superficies (aparecerá una diana).
+3) Toca la pantalla para colocar el objeto (modelo bloqueado por el autor).
+4) Pinza para escalar, dos dedos para girar.');
     });
 
     // Enter AR via ARButton (inserts a native-styled button); also bind our FAB
