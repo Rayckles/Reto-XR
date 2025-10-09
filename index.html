@@ -3,36 +3,28 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Ver modelo en tu habitación (AR)</title>
-
-  <!-- Componente de Google: <model-viewer> -->
+  <title>XR mínimo v8</title>
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-
   <style>
-    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    body { margin:0; font-family:system-ui; }
     header { padding:16px; border-bottom:1px solid #eee; }
-    h1 { margin:0 0 6px 0; font-size:20px; }
-    p { margin:4px 0; }
-    model-viewer { width:100vw; height:calc(100vh - 88px); display:block; background:#f7f7f7; }
-    button[slot="ar-button"]{
-      position:absolute; left:50%; transform:translateX(-50%); bottom:16px;
-      padding:12px 16px; border:0; border-radius:10px; background:#fff; box-shadow:0 8px 20px rgba(0,0,0,.18);
-      font-size:16px; cursor:pointer;
-    }
-    .center { text-align:center; margin:10px 0 16px; }
-    .btn { display:inline-block; padding:10px 14px; border:1px solid #ddd; border-radius:10px; text-decoration:none; }
+    h1 { margin:0 0 6px 0; }
+    .btn { display:inline-block; margin:12px 0; padding:12px 16px; border:1px solid #ddd; border-radius:8px; text-decoration:none; }
+    model-viewer { width:100vw; height:70vh; display:block; background:#f7f7f7; }
   </style>
 </head>
 <body>
   <header>
-    <h1>AR: ver tu modelo en la habitación</h1>
-    <p>Toca <b>“Ver en tu espacio”</b>. Si no sale, usa el botón de respaldo.</p>
-    <p style="font-size:13px;opacity:.75">Android: Scene Viewer/WebXR · iPhone: Quick Look (requiere USDZ, ver nota).</p>
+    <h1>VERSIÓN v8 — Prueba AR</h1>
+    <p>Si NO ves “VERSIÓN v8” arriba, estás viendo la caché.</p>
+    <p><a class="btn" rel="ar" target="_blank"
+      href="https://arvr.google.com/scene-viewer/1.0?file=https://rayckles.github.io/Reto-XR/rumi__fortnite_skin__fortnite_x_kpdh.glb&mode=ar_only">
+      Abrir en AR (Android)
+    </a></p>
   </header>
 
-  <!-- Tu modelo en 3D + AR -->
   <model-viewer
-    src="rumi__fortnite_skin__fortnite_x_kpdh.glb"   <!-- TU GLB -->
+    src="https://rayckles.github.io/Reto-XR/rumi__fortnite_skin__fortnite_x_kpdh.glb"
     ar
     ar-modes="scene-viewer webxr quick-look"
     camera-controls
@@ -44,21 +36,5 @@
       <button slot="ar-button">Ver en tu espacio</button>
       <div slot="ar-prompt">Mueve el móvil para detectar una superficie…</div>
   </model-viewer>
-
-  <!-- Botón de respaldo: abre Scene Viewer directamente en Android (pone la URL absoluta automáticamente) -->
-  <p class="center">
-    <a id="open-ar" class="btn" rel="ar" target="_blank">Abrir en AR (Android)</a>
-  </p>
-
-  <script>
-    // Construye automáticamente la URL absoluta de tu GLB para Scene Viewer (Android).
-    (function () {
-      const glbRelative = "rumi__fortnite_skin__fortnite_x_kpdh.glb";
-      const base = new URL(window.location.href);
-      const glbAbs = new URL(glbRelative, base).href;
-      const sceneViewer = "https://arvr.google.com/scene-viewer/1.0?file=" + encodeURIComponent(glbAbs) + "&mode=ar_only";
-      document.getElementById("open-ar").href = sceneViewer;
-    })();
-  </script>
 </body>
 </html>
